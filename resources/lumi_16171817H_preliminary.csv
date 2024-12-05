@@ -1,0 +1,34 @@
+Description,                   Corr,2016,2017,2018,2017H
+Luminosity,                      -,   36.33, 41.48, 59.83, 0.1998
+# Normalization
+X-Y factorization,               C,   0.5, 0.8, 2.0, 0.8
+Length scale,                    C,   0.3, 0.3, 0.2, 0.3
+Orbit drift Syst,                C,   0.5, 0.0, 0.0, 0.0
+Orbit drift Rand,                U,   0.1, 0.0, 0.1, 0.0
+Orbit drift Rand (17),           C,   0.0, 0.2, 0.0, 0.2
+Beam-beam effects (15-16),       C,   0.5, 0.0, 0.0, 0.0
+Beam-beam effects (17-18),       C,   0.0, 0.6, 0.2, 0.6
+Beam current calibration,        C,   0.2, 0.3, 0.2, 0.3
+Ghosts and satellites,           C,   0.1, 0.1, 0.1, 0.1
+Scan to scan variation,          U,   0.2, 0.0, 0.3, 0.0
+Scan to scan variation (17),     C,   0.0, 0.9, 0.0, 0.9
+Bunch to bunch variation,        U,   0.0, 0.0, 0.1, 0.0
+Bunch to bunch variation (17),   C,   0.0, 0.1, 0.0, 0.1
+Cross-detector consistency,      U,   0.0, 0.0, 0.5, 0.0
+Cross-detector consistency (17), C,   0.0, 0.6, 0.0, 0.6
+Background subtraction,          U,   0.0, 0.0, 0.1, 0.0
+
+# Integration
+PCC afterglow type 1 (15-16),    C,   0.3, 0.0, 0.0, 0.0
+PCC afterglow type 2 (15-16),    C,   0.3, 0.0, 0.0, 0.0
+HF afterglow type 1 (18),        U,   0.0, 0.0, 0.1, 0.0
+HF afterglow type 1 (17),        C,   0.0, 0.2, 0.0, 0.2
+HF afterglow type 2 (18),        U,   0.0, 0.0, 0.4, 0.0
+HF afterglow type 2 (17),        C,   0.0, 0.3, 0.0, 0.3
+Cross-detector stability,        U,   0.5, 0.0, 0.6, 0.0
+Cross-detector stability (17),   C,   0.5, 0.5, 0.6, 0.5
+PCC linearity (15-16),           C,   0.3, 0.0, 0.0, 0.0
+HF linearity (18),               U,   0.0, 0.0, 1.1, 0.0
+HF linearity (17),               C,   0.0, 1.5, 0.0, 0.2
+CMS deadtime,                    U,   0.1, 0.0, 0.1, 0.0
+CMS deadtime (17),               C,   0.0, 0.5, 0.0, 0.5

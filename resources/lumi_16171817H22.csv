@@ -1,0 +1,43 @@
+Description,                       Corr, 2016preVFP, 2016postVFP, 2016, 2017, 2018, 2017H, 2022
+Value,                             -,   18910.381126, 16968.409375000003, 35878.790501 , 37568.897576999996, 59629.669634, 202.692817, 38040
+
+# Normalization
+X-Y factorization,                 C,   0.5, 0.5, 0.5, 0.8, 2.0, 0.8, 0.0
+Length scale,                      C,   0.3, 0.3, 0.3, 0.3, 0.2, 0.3, 0.0
+Orbit drift Syst,                  C,   0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+Orbit drift Rand,                  U,   0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0
+Orbit drift Rand (16),             C,   0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0
+Orbit drift Rand (17),             C,   0.0, 0.0, 0.0, 0.2, 0.0, 0.2, 0.0
+Beam-beam effects (15-16),         C,   0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+Beam-beam effects (17-18),         C,   0.0, 0.0, 0.0, 0.6, 0.2, 0.6, 0.0
+Beam current calibration,          C,   0.2, 0.2, 0.2, 0.3, 0.2, 0.3, 0.0
+Ghosts and satellites,             C,   0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0
+Scan to scan variation,            U,   0.0, 0.0, 0.0, 0.0, 0.3, 0.0, 0.0
+Scan to scan variation (16),       C,   0.2, 0.2, 0.2, 0.0, 0.0, 0.0, 0.0
+Scan to scan variation (17),       C,   0.0, 0.0, 0.0, 0.9, 0.0, 0.9, 0.0
+Bunch to bunch variation,          U,   0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0
+Bunch to bunch variation (17),     C,   0.0, 0.0, 0.0, 0.1, 0.0, 0.1, 0.0
+Cross-detector consistency,        U,   0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0
+Cross-detector consistency (17),   C,   0.0, 0.0, 0.0, 0.6, 0.0, 0.6, 0.0
+Background subtraction,            U,   0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0
+
+# Integration
+PCC afterglow type 1 (15-16),      C,   0.3, 0.3, 0.3, 0.0, 0.0, 0.0, 0.0
+PCC afterglow type 2 (15-16),      C,   0.3, 0.3, 0.3, 0.0, 0.0, 0.0, 0.0
+HF afterglow type 1 (18),          U,   0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0
+HF afterglow type 1 (17),          C,   0.0, 0.0, 0.0, 0.2, 0.0, 0.2, 0.0
+HF afterglow type 2 (18),          U,   0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0
+HF afterglow type 2 (17),          C,   0.0, 0.0, 0.0, 0.3, 0.0, 0.3, 0.0
+Cross-detector stability,          U,   0.0, 0.0, 0.0, 0.0, 0.6, 0.0, 0.0
+Cross-detector stability (16),     C,   0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0
+Cross-detector stability (17),     C,   0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0
+PCC linearity (15-16),             C,   0.3, 0.3, 0.3, 0.0, 0.0, 0.0, 0.0
+HF linearity (18),                 U,   0.0, 0.0, 0.0, 0.0, 1.1, 0.0, 0.0
+HF linearity (17-18),              C,   0.0, 0.0, 0.0, 1.5, 0.0, 0.2, 0.0
+CMS deadtime,                      U,   0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0
+CMS deadtime (16),                 C,   0.1, 0.1, 0.1, 0.0, 0.0, 0.0, 0.0
+CMS deadtime (17),                 C,   0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0
+
+# ad hoc uncertainty
+Adhoc (22),                        C,   0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0
+

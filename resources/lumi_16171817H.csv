@@ -1,0 +1,31 @@
+Description,                   Corr,2015,2016,2017,2018,2017H
+Luminosity,                    -,    2.27,36.33,41.48,59.83,0.1998
+# Normalization
+X-Y factorization (15-16),     C,   0.5, 0.5, 0.0,  0.0,  0.0
+X-Y factorization (17-18),     C,   0.0, 0.0, 0.33, 0.36, 0.33
+Length scale (15-16),          U,   0.2, 0.3, 0.0,  0.0,  0.0
+Length scale (17),             C,   0.0, 0.0, 0.12, 0.0,  0.12
+Length scale (18),             U,   0.0, 0.0, 0.0,  0.14, 0.0
+Orbit drift Syst,              C,   0.8, 0.5, 0.14, 0.18, 0.14
+Orbit drift Rand,              U,   0.2, 0.1, 0.0,  0.0,  0.0
+Beam-beam effects (15-16),     C,   0.5, 0.5, 0.0,  0.0,  0.0
+Beam-beam effects (17-18),     C,   0.0, 0.0, 0.29, 0.30, 0.29
+Beam current calibration,      C,   0.2, 0.2, 0.2,  0.2,  0.2
+Ghosts and satellites,         C,   0.1, 0.1, 0.06, 0.07, 0.06
+Scan to scan variation,        U,   0.5, 0.2, 0.0,  0.25, 0.0
+Scan to scan variation (17),   C,   0.0, 0.0, 0.24, 0.0,  0.24
+Bunch to bunch variation,      U,   0.0, 0.0, 0.0,  0.1,  0.0
+Bunch to bunch variation (17), C,   0.0, 0.0, 0.1,  0.0,  0.1
+Cross-detector consistency,    U,   0.0, 0.0, 0.0,  0.14, 0.0
+Cross-detector consistency(17),C,   0.0, 0.0, 0.42, 0.0,  0.42
+
+# Integration
+PCC afterglow type 1 (15-16),  C,   0.3, 0.3, 0.0,  0.0,  0.0
+PCC afterglow type 2 (15-16),  C,   0.1, 0.3, 0.0,  0.0,  0.0
+Cross-detector stability,      U,   0.6, 0.5, 0.43, 0.39, 0.56
+PCC linearity (15-16),         C,   0.5, 0.3, 0.0,  0.0,  0.0
+Linearity (17-18),             C,   0.0, 0.0, 0.48, 0.45, 0.04
+CMS deadtime,                  U,   0.5, 0.1, 0.0,  0.0,  0.0
+
+# The correlation scheme as presented by Gabi here:
+# https://indico.cern.ch/event/833744/contributions/3493738/attachments/1877010/3091250/Proposal_for_Lumi_POG_recommendation_on_combination_of_different_data_taking_periods1.pdf

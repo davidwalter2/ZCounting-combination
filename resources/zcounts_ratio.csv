@@ -1,0 +1,29 @@
+Description,                       Corr, 2016, 2016preVFP, 2016postVFP, 2017, 2018
+Luminosity,                        -,    36.31, 19.50, 16.81, 41.48, 59.83
+
+# Statistical
+Stat,                              U,    0.02, 0.03, 0.03, 0.02, 0.02
+Stat 17H,                          C,    0.29, 0.29, 0.29, 0.29, 0.29
+
+# Prefiring
+ECAL prefiring,                    C,    0.11, 0.12, 0.11, 0.10, 0.14
+Muon prefiring (stat),             U,    0.30, 0.37, 0.22, 0.08, 0.08
+Muon prefiring (stat 17H),         C,    0.08, 0.08, 0.08, 0.0,  0.08
+Muon prefiring (syst),             C,    0.33, 0.38, 0.28, 0.0,  0.0
+
+# Correaltions
+Correlation HLT,                   C,    0.03, 0.03, 0.02, 0.02, 0.01
+Correlation IO,                    C,    0.24, 0.40, 0.02, 0.01, 0.02
+Correlation ID,                    C,    0.05, 0.11, 0.03, 0.01, 0.01
+
+# resolution
+Inner track resolution,            C,    -0.24, -0.35, 0.12, 0.15, 0.15
+Outer track resolution,            C,    0.02, 0.02, 0.01, 0.01, 0.0
+
+# Other systematics
+Fit stability,                     U,    0.10, 0.10, 0.10, 0.10, 0.10
+Signal model - tracking,           C,    0.30, 0.30, 0.30, 0.30, 0.30
+Signal model - yield,              C,    0.30, 0.30, 0.30, 0.30, 0.30
+Background model - pass,           C,    0.10, 0.10, 0.10, 0.10, 0.10
+Background model - fail,           C,    0.10, 0.10, 0.10, 0.10, 0.10
+
