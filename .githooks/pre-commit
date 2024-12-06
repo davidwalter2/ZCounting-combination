@@ -97,7 +97,7 @@ for FILE in $STAGED_FILES_PY; do
     MODIFIED_FILES+=("$FILE")
   fi
 
-  flake8 $FILE --max-line-length 88
+  flake8 $FILE --ignore=E226,E231,E501,E731,E741,W503 --max-line-length 88
 
 done
 

@@ -6,52 +6,62 @@ import pandas as pd
 import uncertainties as unc
 import zfit
 from hist import Hist
-from plot_utils_zfit import plot_matrix, plot_pulls, plot_pulls_lumi, plot_scan
 from uncertainties import unumpy as unp
 
-from common import common, parsing
-from common.utils import simplify_uncertainties
+from utils import common, functions, logging, output_tools, parsing
+from utils.plot_functions import plot_matrix
+from utils.plot_functions_zfit import plot_pulls, plot_pulls_lumi, plot_scan
 
 os.environ["ZFIT_DISABLE_TF_WARNINGS"] = "1."
 
-parser = parsing.base_parser()
+parser = parsing.plot_parser()
 parser.add_argument(
     "--eras",
-    default=["2017", "2017H", "2018"],
-    nargs="+",
+    default=None,
+    nargs="*",
     help="list of eras to be used in combination",
 )
 parser.add_argument(
     "--lumi",
-    default=f"{common.dir_reources}/combination_tables/lumi_16171817H.txt",
+    default=f"{common.dir_data}/uncertainty_tables/lumi_16171817H.csv",
     type=str,
     help="file containing uncertainties on luminosity",
 )
 parser.add_argument(
     "--zrate",
-    default=f"{common.dir_reources}/combination_tables/zcounts_ratio.txt",
+    default=f"{common.dir_data}/uncertainty_tables/zcounts.csv",
     type=str,
     help="file containing uncertainties on z rate",
 )
+parser.add_argument(
+    "--saturated", default=False, action="store_true", help="Run saturated model"
+)
+parser.add_argument(
+    "--simplify",
+    default=False,
+    action="store_true",
+    help="Simplify uncertainties by building covariance matrix",
+)
 parser.add_argument("--unblind", default=False, action="store_true", help="Fit on data")
-parser.add_argument("-o", "--output", default="Test", type=str, help="give output dir")
+
 args = parser.parse_args()
 
-eras = args.eras
+logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 
-outDir = args.output
-if not os.path.isdir(outDir):
-    os.mkdir(outDir)
+outDir = output_tools.make_plot_dir(
+    args.outpath, args.outfolder, eoscp=output_tools.is_eosuser_path(args.outpath)
+)
 
 # --- settings
 
-# fiducial Z cross section at 13TeV
+# fiducial Z cross section at 13TeV in fb
 xsec = 734
 xsec_uncertainty = None  # no uncertainty on cross section - free floating parameter
 # xsec_uncertainty = 0.03   # uncertainty on cross section - gaussian constraint
 
 # ratio of fiducial cross sections at different center of mass energies (13.6 / 13TeV for 2022)
 energy_extrapolation = {
+    "2016": 1.0,
     "2016preVFP": 1.0,
     "2016postVFP": 1.0,
     "2017": 1.0,
@@ -62,6 +72,7 @@ energy_extrapolation = {
 
 # statistical uncertainties of Z yields, right now hard coded TODO
 z_yields_stat = {
+    "2016": 0.00022358876877688386,
     "2016preVFP": 0.00030886129248932546,
     "2016postVFP": 0.0003240928650176417,
     "2017": 0.00021328236230086072,
@@ -72,38 +83,71 @@ z_yields_stat = {
 
 # --- calculate initial values / prefit plots
 
-uncertainties_lumi, ref_lumi = simplify_uncertainties(args.lumi, eras, prefix="l")
-uncertainties_z, z_yields = simplify_uncertainties(args.zrate, eras, prefix="z")
+if args.simplify:
+    uncertainties_lumi, ref_lumi, covariance_lumi_prefit = (
+        functions.simplify_uncertainties(args.lumi, args.eras, prefix="l")
+    )
+    uncertainties_z, z_yields, covariance_z_prefit = functions.simplify_uncertainties(
+        args.zrate, args.eras, prefix="z"
+    )
+else:
+    uncertainties_lumi, ref_lumi, covariance_lumi_prefit = functions.load_nuisances(
+        args.lumi, args.eras
+    )
+    uncertainties_z, z_yields, covariance_z_prefit = functions.load_nuisances(
+        args.zrate, args.eras
+    )
 
-covariance_lumi_prefit = unc.correlation_matrix(
-    [ref_lumi[e] for e in eras]
-    + [
-        sum(ref_lumi.values()),
-    ]
-)
+ref_lumi = {
+    k: v
+    for k, v in zip(
+        ref_lumi.keys(),
+        unc.correlated_values(
+            np.array([v for v in ref_lumi.values()]), covariance_lumi_prefit
+        ),
+    )
+}
+
+z_yields = {
+    k: v
+    for k, v in zip(
+        z_yields.keys(),
+        unc.correlated_values(
+            np.array([v for v in z_yields.values()]), covariance_z_prefit
+        ),
+    )
+}
+
+eras = [k for k in ref_lumi.keys()]
+
 plot_matrix(
     covariance_lumi_prefit,
-    labels=eras
-    + [
-        "Sum",
-    ],
+    labels=eras,
+    name="lumi_prefit",
+    matrix_type="covariance",
+    outDir=outDir,
+)
+
+plot_matrix(
+    covariance_lumi_prefit,
+    labels=eras,
     name="lumi_prefit",
     matrix_type="correlation",
     outDir=outDir,
 )
 
-covariance_z_prefit = unc.correlation_matrix(
-    [z_yields[e] for e in eras]
-    + [
-        sum(z_yields.values()),
-    ]
-)
 plot_matrix(
     covariance_z_prefit,
-    labels=eras
-    + [
-        "Sum",
-    ],
+    labels=eras,
+    name="zyield_prefit",
+    matrix_type="covariance",
+    outDir=outDir,
+)
+
+
+plot_matrix(
+    covariance_z_prefit,
+    labels=eras,
     name="zyield_prefit",
     matrix_type="correlation",
     outDir=outDir,
@@ -131,14 +175,12 @@ z_yields_uncorrected = {
 z_weights = {
     era: z_yields[era].n / z_yields_uncorrected[era] for era in eras
 }  # the per event weights to get from uncorrected to corrected yield
-# hZ[:] = [(z_yields[era], z_yields_uncorrected[era] * z_weights[era]**2) for era in eras]      # the variance is given by square of weights times uncorrected yields
 
 # set uncorrected yields for data
 hZ[:] = [int(z_yields_uncorrected[era]) for era in eras]
 
 # efficiencies to get from corrected to uncorrected number
 z_efficiencies = {era: z_yields_uncorrected[era] / z_yields[era].n for era in eras}
-
 
 # set the reference lumi counts
 hists_ref = {}
@@ -159,19 +201,18 @@ data = zfit.data.BinnedData.from_hist(hZ)
 
 # make extended pdfs, each bin is scaled by a separate histogram
 # cross section as a common normalization
-rate_xsec = zfit.Parameter("r_xsec", 0, -1.0, 1.0)
+if args.saturated:
+    rate_xsec = [zfit.Parameter(f"r_xsec_{era}", 1.0, 0.8, 1.2) for era in eras]
+else:
+    rate_xsec = zfit.Parameter("r_xsec", 1.0, 0.8, 1.2)
 
 # nuisance parameters on luminosity
 nuisances_lumi = {
-    key: zfit.Parameter("n_{0}".format(key), 0, -5.0, 5.0)
-    for key in uncertainties_lumi.keys()
+    key: zfit.Parameter(key, 0, -5.0, 5.0) for key in uncertainties_lumi.keys()
 }
 
 # nuisance parameters on Z yield
-nuisances_z = {
-    key: zfit.Parameter("n_{0}".format(key), 0, -5.0, 5.0)
-    for key in uncertainties_z.keys()
-}
+nuisances_z = {key: zfit.Parameter(key, 0, -5.0, 5.0) for key in uncertainties_z.keys()}
 
 # all nuisance parameters
 nuisances = {**nuisances_lumi, **nuisances_z}
@@ -182,10 +223,10 @@ constraints = {
     for key, param in nuisances.items()
 }
 
-if xsec_uncertainty is not None:
+if xsec_uncertainty is not None and not args.saturated:
     # put a gaussian constraint on the cross section
     constraints["r_xsec"] = zfit.constraint.GaussianConstraint(
-        rate_xsec, observation=0.0, uncertainty=xsec_uncertainty
+        rate_xsec, observation=1.0, uncertainty=xsec_uncertainty
     )
 
 
@@ -194,31 +235,36 @@ uncertainties_lumi_era = {}
 nuisances_lumi_era = {}
 uncertainties_z_era = {}
 nuisances_z_era = {}
+uncertainties_era = {}
+nuisances_era = {}
 for era in eras:
     uncertainties_lumi_era[era] = []
     nuisances_lumi_era[era] = []
     for key, uncertainty in uncertainties_lumi.items():
         if era in uncertainty.keys():
-            uncertainties_lumi_era[era].append(uncertainty[era] / 100.0 + 1)
+            uncertainties_lumi_era[era].append(uncertainty[era] + 1)
             nuisances_lumi_era[era].append(nuisances_lumi[key])
 
     uncertainties_z_era[era] = []
     nuisances_z_era[era] = []
     for key, uncertainty in uncertainties_z.items():
         if era in uncertainty.keys():
-            uncertainties_z_era[era].append(uncertainty[era] / 100.0 + 1)
+            uncertainties_z_era[era].append(uncertainty[era] + 1)
             nuisances_z_era[era].append(nuisances_z[key])
+
+    uncertainties_era[era] = [*uncertainties_z_era[era], *uncertainties_lumi_era[era]]
+    nuisances_era[era] = [*nuisances_z_era[era], *nuisances_lumi_era[era]]
 
 
 def get_luminosity_function(era):
     # return function to calculate luminosity for a year
 
     # central value of luminosity
-    central = ref_lumi[era].n
+    lumi = ref_lumi[era].n
 
     # dictionary with uncertainties for the considered era
     def function(params):
-        l = central
+        l = lumi
         for i, p in enumerate(params):
             l *= uncertainties_lumi_era[era][i] ** p
         return l
@@ -226,56 +272,59 @@ def get_luminosity_function(era):
     return function
 
 
-def get_scale_function(era):
+def get_nexp_function(era):
+    # return function to calculate number of expected Z events
 
     z_eff = z_efficiencies[era]
+    lumi = ref_lumi[era].n
     extrapolation = energy_extrapolation[era]
 
-    def function(rate_xsec, lumi, params):  # , parameters=[]):
-        s = xsec * extrapolation * z_eff * (1 + rate_xsec) * lumi
-        # apply nuisance parameters
-        # for p in parameters:
-        #     s *= p
-        for i, p in enumerate(params):
-            s *= uncertainties_z_era[era][i] ** p
-        return s
+    nexp_0 = xsec * extrapolation * z_eff * lumi
+
+    def function(params):
+        nexp = nexp_0 * params[0]
+        for i, p in enumerate(params[1:]):
+            nexp *= uncertainties_era[era][i] ** p
+        return nexp
 
     return function
 
 
 models = {}
 lumis = {}
-scales = {}
-p_lumis = {}
-for era in eras:
-    print("create model for {0}".format(era))
-
-    # p_lumi = zfit.Parameter('l_{0}'.format(era), 1, 0.5, 1.5, floating=True)
+nexps = {}
+for i, era in enumerate(eras):
+    logger.info(f"create model for {era}")
 
     # lumi parameter including uncetainties
     l = zfit.ComposedParameter(
-        "lumi_{0}".format(era),
+        f"lumi_{era}".format(era),
         get_luminosity_function(era),
-        # params=[p_lumi, nuisances_lumi_era[era]]
         params=[nuisances_lumi_era[era]],
     )
 
-    # absolute scale including uncertainties on cross section, acceptance, and efficiencies
-    s = zfit.ComposedParameter(
-        "scale_{0}".format(era),
-        get_scale_function(era),
-        params=[rate_xsec, l, nuisances_z_era[era]],
+    if args.saturated:
+        r_xsec = rate_xsec[i]
+    else:
+        r_xsec = rate_xsec
+
+    # Number of expected Z events, including uncertainties on cross section, acceptance, and efficiencies
+    nexp = zfit.ComposedParameter(
+        f"nexp_{era}".format(era),
+        get_nexp_function(era),
+        params=[
+            r_xsec,
+            *nuisances_era[era],
+        ],
     )
 
-    m = zfit.pdf.HistogramPDF(hists_ref[era], extended=s, name="PDF_Bin{0}".format(era))
+    m = zfit.pdf.HistogramPDF(hists_ref[era], extended=nexp, name=f"PDF_Bin{era}")
 
     lumis[era] = l
+    nexps[era] = nexp
     models[era] = m
-    scales[era] = s
-    # p_lumis[era] = p_lumi
 
-
-# build composite model
+logger.info("Build composite model")
 model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
 
 # if not args.unblind:
@@ -289,24 +338,28 @@ loss = zfit.loss.ExtendedBinnedNLL(
     options={"numhess": False},
 )
 
+logger.info("Minimize")
 minimizer = zfit.minimize.ScipyTrustConstrV1(hessian="zfit")
 result = minimizer.minimize(loss)
 status = result.valid
 
-print(f"status: {status}")
+logger.info(f"status: {status}")
+
+logger.info(f"nll = {loss.value().numpy()}")
+
 
 try:
     hessval = result.loss.hessian(list(result.params)).numpy()
     cov = np.linalg.inv(hessval)
     eigvals = np.linalg.eigvalsh(hessval)
     covstatus = eigvals[0] > 0.0
-    print("eigvals", eigvals)
+    logger.info("eigvals", eigvals)
 except Exception as e:
-    print(f"An error occurred: {e}")
+    logger.info(f"An error occurred: {e}")
     cov = None
     covstatus = False
 
-print(f"covariance status: {covstatus}")
+logger.info(f"covariance status: {covstatus}")
 
 
 # --- error propagation to get correlated uncertainty on parameters
@@ -341,15 +394,15 @@ df_lumi["prefit"] = lumi_prefit
 
 df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
 
-print(df_lumi)
+logger.info(df_lumi)
 
 corr_matrix_lumi = unc.correlation_matrix(lumi_values)
 cov_matrix_lumi = (
     np.array(unc.covariance_matrix(lumi_values)) / 1000000.0
 )  # covariance matrix in fb
 
-# print(corr_matrix_lumi)
-# print(cov_matrix_lumi)
+# logger.info(corr_matrix_lumi)
+# logger.info(cov_matrix_lumi)
 
 all_params = [
     rate_xsec,
@@ -376,13 +429,16 @@ plot_pulls(result, outDir=outDir)
 
 plot_pulls_lumi(df_lumi, outDir=outDir)
 
-exit()
-
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, profile=False, outDir=outDir)
-plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)
+# plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)
 
-# for era, p in p_lumis.items():
+# for era, p in lumis.items():
 #     plot_scan(result, p, "l_"+era, limits=0.1)
+
+if output_tools.is_eosuser_path(args.outpath):
+    output_tools.copy_to_eos(outDir, args.outpath, args.outfolder)
+
+exit()
 
 for n, p in nuisances.items():
     # plot_scan(result, loss, minimizer, p, "n_"+n, profile=False, outDir=outDir)

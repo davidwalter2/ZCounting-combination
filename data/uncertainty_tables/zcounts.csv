@@ -1,0 +1,28 @@
+Description,                       Corr, 2016, 2016preVFP, 2016postVFP, 2017, 2017H, 2018, 2022
+Value,                             -, 24806845.0, 13148175, 11658670, 27013020, 142780,  41600100, 26571140
+
+# Corrections from simulation
+Correlation HLT,                   C, 0.06, 0.07, 0.05, 0.05, 0.03, 0.04, 0.04
+Correlation ID,                    C, 0.05, 0.08, 0.0,  0.0,  0.0,  0.0,  0.0
+Correlation IO,                    C, 0.24, 0.39, 0.06, 0.01, 0.0,  0.01, 0.01
+
+# Prefiring
+Muon prefiring (stat),             U, 0.30, 0.37, 0.22, 0.0,  0.0,  0.08, 0.0
+Muon prefiring (stat 2017),        C, 0.0,   0.0,  0.0, 0.08, 0.08, 0.0,  0.0
+Muon prefiring (syst),             C, 0.46, 0.51, 0.4,  0.13, 0.13, 0.13, 0.0
+ECAL prefiring,                    C, 0.03, 0.03, 0.04, 0.03, 0.14, 0.0,  0.0
+
+# Acceptance
+Outer track resolution,            C, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50, 1.50
+Inner track resolution,            C, 0.21, 0.27, 0.15, 0.14, 0.01, 0.14, 0.14
+
+# Background subtraction
+Signal model,                      C, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50
+Background model,                  C, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20, 0.20
+
+# Other systematics
+Fit stability,                     U, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30
+Extrapolation (Run2),              C, 0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.5
+
+# Statistical (already included in Poisson term)
+# Stat,                              U, 0.02, 0.03, 0.03, 0.02, 0.29, 0.02, 0.02

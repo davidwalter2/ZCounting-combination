@@ -2,7 +2,10 @@
 
 import argparse
 
-from common import utils
+from utils import logging
+from utils.functions import simplify_uncertainties
+
+logger = logging.child_logger(__name__)
 
 # This script will combine the luminosities for different years with uncertainties as specified in the input
 # text file. The file should have the format:
@@ -50,7 +53,7 @@ group.add_argument(
 )
 args = parser.parse_args()
 
-result, values = utils.simplify_uncertainties(
+result, values = simplify_uncertainties(
     args.inputFile,
     args.years,
     args.ratio,
@@ -59,18 +62,20 @@ result, values = utils.simplify_uncertainties(
 )
 
 total = sum([v for v in values.values()])
-print("")
-print(rf"Total luminosity is {total} (uncertainty of {round(total.s/total.n*100,2)}%)")
+logger.info("")
+logger.info(
+    rf"Total luminosity is {total} (uncertainty of {round(total.s/total.n*100,2)}%)"
+)
 
-print("")
-print("Luminosity and uncertainty per year is")
+logger.info("")
+logger.info("Luminosity and uncertainty per year is")
 for y, v in values.items():
-    print(f"{y}: {v} (uncertainty of {round(v.s/v.n*100,2)}%)")
+    logger.info(f"{y}: {v} (uncertainty of {round(v.s/v.n*100,2)}%)")
 
-print("")
-print("Simplified correlation scheme")
+logger.info("")
+logger.info("Simplified correlation scheme")
 
 for years, yearsSet in result.items():
-    print(years)
+    logger.info(years)
     for year, uncertainty in yearsSet.items():
-        print(f"{year}: {uncertainty}")
+        logger.info(f"{year}: {uncertainty}")
