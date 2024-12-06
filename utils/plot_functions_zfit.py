@@ -1,21 +1,26 @@
+import matplotlib.pyplot as plt
+import mplhep as hep
+import numpy as np
+
 from utils import logging, plot_tools, styles
 
 logger = logging.child_logger(__name__)
 
 
-def plot_pulls(result, outDir="./", markersize=4):
+def plot_pulls(
+    result, idx_lo=None, idx_hi=None, outDir="./", markersize=4, cms_decor=None
+):
     """
     nuisance parameters pulls and constraints
     """
-    import matplotlib.pyplot as plt
-    import numpy as np
 
     logger.info("Make pulls plot")
+    params = [result.params[p] for p in result.params][idx_lo:idx_hi]
+    names = np.array([p.label for p in result.params])[idx_lo:idx_hi]
 
-    names = np.array([p.name for p in result.params])
-    xx = np.array([result.params[p]["correlated_value"].n for p in result.params])
-    xx_hi = np.array([result.params[p]["correlated_value"].s for p in result.params])
-    xx_lo = np.array([result.params[p]["correlated_value"].s for p in result.params])
+    xx = np.array([p["correlated_value"].n for p in params])
+    xx_hi = np.array([p["correlated_value"].s for p in params])
+    xx_lo = np.array([p["correlated_value"].s for p in params])
     yy = np.arange(len(names))
 
     # parameters with a name starting with "r_" are rate parameters
@@ -24,7 +29,7 @@ def plot_pulls(result, outDir="./", markersize=4):
     names = np.array([styles.translate.get(n, n) for n in names])
 
     fig, ax = plt.subplots()
-    fig.subplots_adjust(hspace=0.0, left=0.4, right=0.97, top=0.99, bottom=0.125)
+    fig.subplots_adjust(hspace=0.0, left=0.4, right=0.97, top=0.97, bottom=0.125)
 
     ymin = yy[0] - 1
     ymax = yy[-1] + 1
@@ -43,13 +48,25 @@ def plot_pulls(result, outDir="./", markersize=4):
                 + "}_{"
                 + str(nround(xx_lo[i]))
                 + "}$",
+                bbox=dict(facecolor="white", edgecolor="none"),
+                zorder=2,  # Lower z-order than the spines
             )
+    for spine in ax.spines.values():
+        spine.set_zorder(3)
 
     # only plot nuisance parameters that are constraint (no rate parameters)
     xx = xx[~is_rate]
     xx_hi = xx_hi[~is_rate]
     xx_lo = xx_lo[~is_rate]
     yy = yy[~is_rate]
+
+    ax.plot([1, 1], [ymin, ymax], linestyle="dashed", color="gray")
+    ax.plot([-1, -1], [ymin, ymax], linestyle="dashed", color="gray")
+
+    ax.plot([2, 2], [ymin, ymax], linestyle="dashed", color="gray")
+    ax.plot([-2, -2], [ymin, ymax], linestyle="dashed", color="gray")
+
+    ax.plot([0.0, 0.0], [ymin, ymax], linestyle="dashed", color="gray")
 
     ax.errorbar(
         xx,
@@ -62,14 +79,8 @@ def plot_pulls(result, outDir="./", markersize=4):
         barsabove=True,
         markersize=markersize,
     )
-
-    ax.plot([1, 1], [ymin, ymax], linestyle="dashed", color="gray")
-    ax.plot([-1, -1], [ymin, ymax], linestyle="dashed", color="gray")
-
-    ax.plot([2, 2], [ymin, ymax], linestyle="dashed", color="gray")
-    ax.plot([-2, -2], [ymin, ymax], linestyle="dashed", color="gray")
-
-    ax.plot([0.0, 0.0], [ymin, ymax], linestyle="dashed", color="gray")
+    if cms_decor is not None:
+        hep.cms.label(label=cms_decor, loc=0, ax=ax, data=True)
 
     ax.set_xlabel("($\\hat{\\Theta} - \\Theta_0 ) / \\Delta \\Theta$")
     ax.set_ylabel("")
@@ -78,15 +89,26 @@ def plot_pulls(result, outDir="./", markersize=4):
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(ymin, ymax)
 
-    plot_tools.save_plot(outDir, "pulls")
+    name = "pulls"
+
+    name += f"_from{idx_lo if idx_lo is not None else 0}"
+    if idx_hi is not None:
+        name += f"to{idx_hi}"
+
+    plot_tools.save_plot(outDir, name)
 
 
-def plot_pulls_lumi(dataframe, outDir="./", xRange=(-0.03, 0.03), markersize=4):
+def plot_pulls_lumi(
+    dataframe,
+    chi2_info=None,
+    outDir="./",
+    xRange=(-0.03, 0.02),
+    markersize=4,
+    cms_decor=None,
+):
     """
     plot results on luminosity
     """
-    import matplotlib.pyplot as plt
-    import numpy as np
 
     logger.info("Make plot of lumi results")
 
@@ -102,16 +124,14 @@ def plot_pulls_lumi(dataframe, outDir="./", xRange=(-0.03, 0.03), markersize=4):
     xx_lo = dataframe["hesse"].values / xx_prefit
     yy = np.arange(len(names))
 
-    xx_prefit = (xx_prefit - xx_prefit) / xx_prefit
-
     fig, ax = plt.subplots()
-    fig.subplots_adjust(hspace=0.0, left=0.4, right=0.97, top=0.99, bottom=0.125)
+    fig.subplots_adjust(hspace=0.0, left=0.4, right=0.97, top=0.97, bottom=0.125)
 
     ymin = yy[0] - 1
     ymax = yy[-1] + 1
 
-    ax.plot([-0.02, -0.02], [ymin, ymax], linestyle="dashed", color="gray")
-    ax.plot([0.02, 0.02], [ymin, ymax], linestyle="dashed", color="gray")
+    # ax.plot([-0.02, -0.02], [ymin, ymax], linestyle="dashed", color="gray")
+    # ax.plot([0.02, 0.02], [ymin, ymax], linestyle="dashed", color="gray")
     ax.plot([-0.01, -0.01], [ymin, ymax], linestyle="dashed", color="gray")
     ax.plot([0.01, 0.01], [ymin, ymax], linestyle="dashed", color="gray")
     ax.plot([0.0, 0.0], [ymin, ymax], linestyle="dashed", color="gray")
@@ -122,7 +142,7 @@ def plot_pulls_lumi(dataframe, outDir="./", xRange=(-0.03, 0.03), markersize=4):
     #         ax.text(-0.5, yy[i]-0.4, "$"+str(nround(xx[i]))+"^{+"+str(nround(xx_hi[i]))+"}_{"+str(nround(xx_lo[i]))+"}$")
 
     ax.errorbar(
-        xx_prefit,
+        np.zeros_like(xx_prefit),
         yy + 0.2,
         xerr=(abs(xx_lo_prefit), abs(xx_hi_prefit)),
         label="prefit",
@@ -146,6 +166,52 @@ def plot_pulls_lumi(dataframe, outDir="./", xRange=(-0.03, 0.03), markersize=4):
         barsabove=True,
         markersize=markersize,
     )
+
+    import pdb
+
+    pdb.set_trace()
+
+    for y, x, x_lo, x_prefit, x_lo_prefit in zip(
+        yy, xx, xx_lo, xx_prefit, xx_lo_prefit
+    ):
+        x = (x * x_prefit + x_prefit) / 1000.0
+        x_lo = (x_lo * x_prefit) / 1000.0
+        x_lo_prefit = (x_lo_prefit * x_prefit) / 1000.0
+        x_prefit = x_prefit / 1000.0
+
+        nround = 1 if x > 10 else 3
+
+        ax.text(
+            xRange[0] + 0.01 * (xRange[1] - xRange[0]),
+            y + 0.2,
+            rf"${round(x_prefit,nround)} \pm {round(abs(x_lo_prefit),nround)} \,\mathrm{{fb}}^{{-1}}$",
+            va="center",
+            ha="left",
+            color="blue",
+        )
+        ax.text(
+            xRange[0] + 0.01 * (xRange[1] - xRange[0]),
+            y - 0.2,
+            rf"${round(x,nround)} \pm {round(abs(x_lo),nround)} \,\mathrm{{fb}}^{{-1}}$",
+            va="center",
+            ha="left",
+        )
+
+    if chi2_info is not None:
+        ax.text(
+            0.01,
+            0.99,
+            rf"$\chi^2/ndf = {round(chi2_info[0],2)}/{chi2_info[1]}$"
+            + "\n"
+            + rf" $(p={chi2_info[2]}\%)$",
+            va="top",
+            ha="left",
+            transform=ax.transAxes,
+        )
+
+    if cms_decor is not None:
+        hep.cms.label(label=cms_decor, loc=0, ax=ax, data=True)
+
     ax.set_xlabel("($\\hat{L} - L_0 ) / L_0$")
     ax.set_ylabel("")
 
@@ -168,8 +234,6 @@ def plot_scan(
     plot likelihood scan
     """
 
-    import matplotlib.pyplot as plt
-    import numpy as np
     import zfit
 
     logger.info("Make likelihood scan for {0}".format(name))

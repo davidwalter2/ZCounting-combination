@@ -3,6 +3,7 @@ import os
 import hist
 import numpy as np
 import pandas as pd
+import scipy
 import uncertainties as unc
 import zfit
 from hist import Hist
@@ -70,15 +71,14 @@ energy_extrapolation = {
     "2022": 1.046,  # With NNLO + N3LL + NLO(EW)
 }
 
-# statistical uncertainties of Z yields, right now hard coded TODO
-z_yields_stat = {
-    "2016": 0.00022358876877688386,
-    "2016preVFP": 0.00030886129248932546,
-    "2016postVFP": 0.0003240928650176417,
-    "2017": 0.00021328236230086072,
-    "2017H": 0.002884547355729706,
-    "2018": 0.0001702104409933952,
-    "2022": 0.0002,  # Just a dummy number for now
+# efficiencies to get from corrected to uncorrected number
+z_efficiencies = {
+    "2016": 0.880627183193766,
+    "2016preVFP": 0.8729268470636643,
+    "2016postVFP": 0.8893522069626418,
+    "2017": 0.8932884309328363,
+    "2017H": 0.9068543037179428,
+    "2018": 0.9023466577682436,
 }
 
 # --- calculate initial values / prefit plots
@@ -156,9 +156,9 @@ plot_matrix(
 if not args.unblind:
     # Use asymov data
     z_yields = {
-        key: value * xsec * energy_extrapolation[key] for key, value in ref_lumi.items()
+        key: value * xsec * z_efficiencies[key] * energy_extrapolation[key]
+        for key, value in ref_lumi.items()
     }
-
 
 # --- set up binned likelihood fit
 nBins = len(eras)
@@ -168,19 +168,8 @@ binHi = nBins
 # set the Z counts
 hZ = Hist(hist.axis.Regular(bins=nBins, start=binLo, stop=binHi, name="x"))
 
-# set yields and variance (statistical uncertainty)
-z_yields_uncorrected = {
-    era: (1.0 / (z_yields_stat[era]) ** 2) for era in eras
-}  # the uncorrected z yields is rederived from the statistical uncertainty
-z_weights = {
-    era: z_yields[era].n / z_yields_uncorrected[era] for era in eras
-}  # the per event weights to get from uncorrected to corrected yield
-
-# set uncorrected yields for data
-hZ[:] = [int(z_yields_uncorrected[era]) for era in eras]
-
-# efficiencies to get from corrected to uncorrected number
-z_efficiencies = {era: z_yields_uncorrected[era] / z_yields[era].n for era in eras}
+# set observed Z yields for data
+hZ[:] = [int(z_yields[era].n) for era in eras]
 
 # set the reference lumi counts
 hists_ref = {}
@@ -200,19 +189,21 @@ obs = zfit.Space("x", binning=binning)
 data = zfit.data.BinnedData.from_hist(hZ)
 
 # make extended pdfs, each bin is scaled by a separate histogram
+
 # cross section as a common normalization
-if args.saturated:
-    rate_xsec = [zfit.Parameter(f"r_xsec_{era}", 1.0, 0.8, 1.2) for era in eras]
-else:
-    rate_xsec = zfit.Parameter("r_xsec", 1.0, 0.8, 1.2)
+rate_xsec = zfit.Parameter("r_xsec", 1.0, 0.8, 1.2)
 
 # nuisance parameters on luminosity
 nuisances_lumi = {
-    key: zfit.Parameter(key, 0, -5.0, 5.0) for key in uncertainties_lumi.keys()
+    key: zfit.Parameter(f"l{i}", 0, -5.0, 5.0, label=key)
+    for i, key in enumerate(uncertainties_lumi.keys())
 }
 
 # nuisance parameters on Z yield
-nuisances_z = {key: zfit.Parameter(key, 0, -5.0, 5.0) for key in uncertainties_z.keys()}
+nuisances_z = {
+    key: zfit.Parameter(f"z{i}", 0, -5.0, 5.0, label=key)
+    for i, key in enumerate(uncertainties_z.keys())
+}
 
 # all nuisance parameters
 nuisances = {**nuisances_lumi, **nuisances_z}
@@ -222,13 +213,18 @@ constraints = {
     key: zfit.constraint.GaussianConstraint(param, observation=0.0, uncertainty=1.0)
     for key, param in nuisances.items()
 }
+if args.saturated:
+    # separate free floating cross section per bin
+    constraints_saturated = constraints.copy()
+    rate_xsec_saturated = [
+        zfit.Parameter(f"r_xsec_{era}_saturated", 1.0, 0.8, 1.2) for era in eras
+    ]
 
-if xsec_uncertainty is not None and not args.saturated:
+if xsec_uncertainty is not None:
     # put a gaussian constraint on the cross section
     constraints["r_xsec"] = zfit.constraint.GaussianConstraint(
         rate_xsec, observation=1.0, uncertainty=xsec_uncertainty
     )
-
 
 # rearange dictionaries: for each era a list of uncertainties, nuisances
 uncertainties_lumi_era = {}
@@ -237,6 +233,7 @@ uncertainties_z_era = {}
 nuisances_z_era = {}
 uncertainties_era = {}
 nuisances_era = {}
+
 for era in eras:
     uncertainties_lumi_era[era] = []
     nuisances_lumi_era[era] = []
@@ -272,7 +269,7 @@ def get_luminosity_function(era):
     return function
 
 
-def get_nexp_function(era):
+def get_nexp_function(era, unc_dict):
     # return function to calculate number of expected Z events
 
     z_eff = z_efficiencies[era]
@@ -284,15 +281,16 @@ def get_nexp_function(era):
     def function(params):
         nexp = nexp_0 * params[0]
         for i, p in enumerate(params[1:]):
-            nexp *= uncertainties_era[era][i] ** p
+            nexp *= unc_dict[era][i] ** p
         return nexp
 
     return function
 
 
 models = {}
-lumis = {}
-nexps = {}
+models_saturated = {}
+# lumis = {}
+# nexps = {}
 for i, era in enumerate(eras):
     logger.info(f"create model for {era}")
 
@@ -303,26 +301,37 @@ for i, era in enumerate(eras):
         params=[nuisances_lumi_era[era]],
     )
 
-    if args.saturated:
-        r_xsec = rate_xsec[i]
-    else:
-        r_xsec = rate_xsec
-
     # Number of expected Z events, including uncertainties on cross section, acceptance, and efficiencies
     nexp = zfit.ComposedParameter(
         f"nexp_{era}".format(era),
-        get_nexp_function(era),
+        get_nexp_function(era, uncertainties_era),
         params=[
-            r_xsec,
+            rate_xsec,
             *nuisances_era[era],
         ],
     )
 
-    m = zfit.pdf.HistogramPDF(hists_ref[era], extended=nexp, name=f"PDF_Bin{era}")
+    # lumis[era] = l
+    # nexps[era] = nexp
+    models[era] = zfit.pdf.HistogramPDF(
+        hists_ref[era], extended=nexp, name=f"PDF_Bin{era}"
+    )
 
-    lumis[era] = l
-    nexps[era] = nexp
-    models[era] = m
+    if args.saturated:
+        # make saturated model
+        # Number of expected Z events, including uncertainties on cross section, acceptance, and efficiencies
+        nexp_saturated = zfit.ComposedParameter(
+            f"nexp_{era}".format(era),
+            get_nexp_function(era, uncertainties_era),
+            params=[
+                rate_xsec_saturated[i],
+                *nuisances_era[era],
+            ],
+        )
+
+        models_saturated[era] = zfit.pdf.HistogramPDF(
+            hists_ref[era], extended=nexp_saturated, name=f"PDF_Bin{era}_saturated"
+        )
 
 logger.info("Build composite model")
 model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
@@ -341,19 +350,17 @@ loss = zfit.loss.ExtendedBinnedNLL(
 logger.info("Minimize")
 minimizer = zfit.minimize.ScipyTrustConstrV1(hessian="zfit")
 result = minimizer.minimize(loss)
-status = result.valid
+nll_value = loss.value().numpy()
 
-logger.info(f"status: {status}")
-
-logger.info(f"nll = {loss.value().numpy()}")
-
+logger.info(f"status: {result.valid}")
+logger.info(f"loss = {nll_value}")
 
 try:
     hessval = result.loss.hessian(list(result.params)).numpy()
     cov = np.linalg.inv(hessval)
     eigvals = np.linalg.eigvalsh(hessval)
     covstatus = eigvals[0] > 0.0
-    logger.info("eigvals", eigvals)
+    logger.info(f"Eigen values: {eigvals}")
 except Exception as e:
     logger.info(f"An error occurred: {e}")
     cov = None
@@ -361,6 +368,31 @@ except Exception as e:
 
 logger.info(f"covariance status: {covstatus}")
 
+if args.saturated:
+    logger.info("Build composite saturated model")
+    model_saturated = zfit.pdf.BinnedSumPDF([m for m in models_saturated.values()])
+    loss_saturated = zfit.loss.ExtendedBinnedNLL(
+        model_saturated,
+        data,
+        constraints=[c for c in constraints_saturated.values()],
+        options={"numhess": False},
+    )
+    logger.info("Minimize")
+    result_saturated = minimizer.minimize(loss_saturated)
+    nll_saturated_value = loss_saturated.value().numpy()
+
+    logger.info(f"status: {result_saturated.valid}")
+    logger.info(f"loss = {nll_saturated_value}")
+
+    chi2_saturated = 2 * (nll_value - nll_saturated_value)
+    ndf = len(rate_xsec_saturated) - (xsec_uncertainty is None)
+    p_val = int(round(scipy.stats.chi2.sf(chi2_saturated, ndf) * 100))
+
+    chi2_info = [chi2_saturated, ndf, p_val]
+
+    logger.info(rf"2*(nll-nll_sat.)/ndf = {chi2_saturated}/{ndf} (p={p_val}%)")
+else:
+    chi2_info = None
 
 # --- error propagation to get correlated uncertainty on parameters
 correlated_values = unc.correlated_values(
@@ -425,9 +457,20 @@ plot_matrix(
     outDir=outDir,
 )
 
-plot_pulls(result, outDir=outDir)
 
-plot_pulls_lumi(df_lumi, outDir=outDir)
+for i in range(int(len(result.params) / 20) + 1):
+    if len(result.params) < (i + 1) * 20:
+        idx_hi = None
+    else:
+        idx_hi = (i + 1) * 20
+
+    idx_lo = i * 20 if i != 0 else None
+
+    plot_pulls(
+        result, idx_lo=idx_lo, idx_hi=idx_hi, outDir=outDir, cms_decor=args.cmsDecor
+    )
+
+plot_pulls_lumi(df_lumi, chi2_info=chi2_info, outDir=outDir, cms_decor=args.cmsDecor)
 
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, profile=False, outDir=outDir)
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)
