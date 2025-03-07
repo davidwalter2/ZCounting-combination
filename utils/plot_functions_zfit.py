@@ -1,22 +1,19 @@
 import matplotlib.pyplot as plt
 import mplhep as hep
 import numpy as np
+import pandas as pd
 
 from utils import logging, plot_tools, styles
 
 logger = logging.child_logger(__name__)
 
 
-def plot_pulls(
-    result, idx_lo=None, idx_hi=None, outDir="./", markersize=4, cms_decor=None
-):
+def plot_pulls(params, names, postfix=None, outDir="./", markersize=4, cms_decor=None):
     """
     nuisance parameters pulls and constraints
     """
 
     logger.info("Make pulls plot")
-    params = [result.params[p] for p in result.params][idx_lo:idx_hi]
-    names = np.array([p.label for p in result.params])[idx_lo:idx_hi]
 
     xx = np.array([p["correlated_value"].n for p in params])
     xx_hi = np.array([p["correlated_value"].s for p in params])
@@ -91,18 +88,18 @@ def plot_pulls(
 
     name = "pulls"
 
-    name += f"_from{idx_lo if idx_lo is not None else 0}"
-    if idx_hi is not None:
-        name += f"to{idx_hi}"
+    if postfix is not None:
+        name += f"_{postfix}"
 
     plot_tools.save_plot(outDir, name)
 
 
 def plot_pulls_lumi(
-    dataframe,
+    df,
+    df_blue=None,
     chi2_info=None,
     outDir="./",
-    xRange=(-0.03, 0.02),
+    xRange=(-0.018, 0.018),
     markersize=4,
     cms_decor=None,
 ):
@@ -112,19 +109,39 @@ def plot_pulls_lumi(
 
     logger.info("Make plot of lumi results")
 
-    names = dataframe["era"].values
+    if df_blue is not None:
+        custom_order = ["2017H", "2016", "2017", "2018", "Sum"]
+        df["era"] = pd.Categorical(df["era"], categories=custom_order, ordered=True)
+        df = df.sort_values(by="era")
 
-    xx_prefit = dataframe["prefit"].apply(lambda x: x.n).values
+    translate = {
+        "2017H": "Low PU",
+    }
 
-    xx_hi_prefit = dataframe["prefit"].apply(lambda x: x.s).values / xx_prefit
-    xx_lo_prefit = xx_hi_prefit
-
-    xx = (dataframe["value"].values - xx_prefit) / xx_prefit
-    xx_hi = dataframe["hesse"].values / xx_prefit
-    xx_lo = dataframe["hesse"].values / xx_prefit
+    names = [translate.get(n, n) for n in df["era"].values]
     yy = np.arange(len(names))
 
-    fig, ax = plt.subplots()
+    xx_prefit = df["prefit"].values
+    xx_hi_prefit = df["prefit_uncertainty"].values / xx_prefit
+    xx_lo_prefit = xx_hi_prefit
+
+    xx_hi_prefit = df["prefit_uncertainty"].values / xx_prefit
+    xx_lo_prefit = xx_hi_prefit
+
+    xx = (df["postfit"].values - xx_prefit) / xx_prefit
+    xx_hi = df["postfit_uncertainty"].values / xx_prefit
+    xx_lo = xx_hi
+
+    if df_blue is not None:
+        xx_prefit_z = (df_blue["prefit_z"].values - xx_prefit[1:]) / xx_prefit[1:]
+        xx_hi_prefit_z = df_blue["prefit_z_uncertainty"].values / xx_prefit[1:]
+        xx_lo_prefit_z = xx_hi_prefit_z
+
+        xx_blue = (df_blue["postfit"].values - xx_prefit[1:]) / xx_prefit[1:]
+        xx_hi_blue = df_blue["postfit_uncertainty"].values / xx_prefit[1:]
+        xx_lo_blue = xx_hi_blue
+
+    fig, ax = plt.subplots(figsize=(4, 4))
     fig.subplots_adjust(hspace=0.0, left=0.4, right=0.97, top=0.97, bottom=0.125)
 
     ymin = yy[0] - 1
@@ -141,13 +158,54 @@ def plot_pulls_lumi(
     #     if r:
     #         ax.text(-0.5, yy[i]-0.4, "$"+str(nround(xx[i]))+"^{+"+str(nround(xx_hi[i]))+"}_{"+str(nround(xx_lo[i]))+"}$")
 
+    if df_blue is not None:
+        # vertical line to separate 2017H
+        ax.plot(xRange, [0.5, 0.5], linestyle="dashed", color="gray")
+
+        yy_ref = yy + 0.3
+        yy_z = yy[1:] + 0.1
+        yy_blue = yy[1:] - 0.1
+        yy_nll = yy - 0.3
+
+        ax.errorbar(
+            xx_prefit_z,
+            yy_z,
+            xerr=(abs(xx_lo_prefit_z), abs(xx_hi_prefit_z)),
+            label="Z lumi",
+            marker="o",
+            color="black",
+            fillstyle="none",
+            linestyle="none",
+            elinewidth=1.0,
+            capsize=1.0,
+            barsabove=True,
+            markersize=markersize,
+        )
+        ax.errorbar(
+            xx_blue,
+            yy_blue,
+            xerr=(abs(xx_lo_blue), abs(xx_hi_blue)),
+            label="BLUE combination",
+            marker="o",
+            color="blue",
+            elinewidth=1.0,
+            linestyle="none",
+            capsize=1.0,
+            barsabove=True,
+            markersize=markersize,
+        )
+    else:
+        yy_ref = yy + 0.2
+        yy_nll = yy - 0.2
+
     ax.errorbar(
         np.zeros_like(xx_prefit),
-        yy + 0.2,
+        yy_ref,
         xerr=(abs(xx_lo_prefit), abs(xx_hi_prefit)),
-        label="prefit",
-        fmt="bo",
-        ecolor="blue",
+        label="Ref. luminosity",
+        marker="o",
+        linestyle="none",
+        color="black",
         elinewidth=1.0,
         capsize=1.0,
         barsabove=True,
@@ -156,66 +214,65 @@ def plot_pulls_lumi(
 
     ax.errorbar(
         xx,
-        yy - 0.2,
+        yy_nll,
         xerr=(abs(xx_lo), abs(xx_hi)),
-        label="postfit",
-        fmt="ko",
-        ecolor="black",
+        label="Likelihood combination",
+        marker="o",
+        linestyle="none",
+        color="red",
         elinewidth=1.0,
         capsize=1.0,
         barsabove=True,
         markersize=markersize,
     )
 
-    import pdb
+    # if df_blue is None:
+    #     for y, x, x_lo, x_prefit, x_lo_prefit in zip(
+    #         yy, xx, xx_lo, xx_prefit, xx_lo_prefit
+    #     ):
+    #         x = (x * x_prefit + x_prefit) / 1000.0
+    #         x_lo = (x_lo * x_prefit) / 1000.0
+    #         x_lo_prefit = (x_lo_prefit * x_prefit) / 1000.0
+    #         x_prefit = x_prefit / 1000.0
 
-    pdb.set_trace()
+    #         nround = 1 if x > 10 else 3
 
-    for y, x, x_lo, x_prefit, x_lo_prefit in zip(
-        yy, xx, xx_lo, xx_prefit, xx_lo_prefit
-    ):
-        x = (x * x_prefit + x_prefit) / 1000.0
-        x_lo = (x_lo * x_prefit) / 1000.0
-        x_lo_prefit = (x_lo_prefit * x_prefit) / 1000.0
-        x_prefit = x_prefit / 1000.0
+    #         ax.text(
+    #             xRange[0] + 0.01 * (xRange[1] - xRange[0]),
+    #             y + 0.2,
+    #             rf"${round(x_prefit,nround)} \pm {round(abs(x_lo_prefit),nround)} \,\mathrm{{fb}}^{{-1}}$",
+    #             va="center",
+    #             ha="left",
+    #             color="black",
+    #         )
+    #         ax.text(
+    #             xRange[0] + 0.01 * (xRange[1] - xRange[0]),
+    #             y - 0.2,
+    #             rf"${round(x,nround)} \pm {round(abs(x_lo),nround)} \,\mathrm{{fb}}^{{-1}}$",
+    #             va="center",
+    #             ha="left",
+    #             color="blue",
+    #         )
 
-        nround = 1 if x > 10 else 3
+    #     if chi2_info is not None:
+    #         ax.text(
+    #             0.01,
+    #             0.99,
+    #             rf"$\chi^2/ndf = {round(chi2_info[0],2)}/{chi2_info[1]}$"
+    #             + "\n"
+    #             + rf" $(p={chi2_info[2]}\%)$",
+    #             va="top",
+    #             ha="left",
+    #             transform=ax.transAxes,
+    #         )
 
-        ax.text(
-            xRange[0] + 0.01 * (xRange[1] - xRange[0]),
-            y + 0.2,
-            rf"${round(x_prefit,nround)} \pm {round(abs(x_lo_prefit),nround)} \,\mathrm{{fb}}^{{-1}}$",
-            va="center",
-            ha="left",
-            color="blue",
-        )
-        ax.text(
-            xRange[0] + 0.01 * (xRange[1] - xRange[0]),
-            y - 0.2,
-            rf"${round(x,nround)} \pm {round(abs(x_lo),nround)} \,\mathrm{{fb}}^{{-1}}$",
-            va="center",
-            ha="left",
-        )
-
-    if chi2_info is not None:
-        ax.text(
-            0.01,
-            0.99,
-            rf"$\chi^2/ndf = {round(chi2_info[0],2)}/{chi2_info[1]}$"
-            + "\n"
-            + rf" $(p={chi2_info[2]}\%)$",
-            va="top",
-            ha="left",
-            transform=ax.transAxes,
-        )
-
-    if cms_decor is not None:
-        hep.cms.label(label=cms_decor, loc=0, ax=ax, data=True)
+    # if cms_decor is not None:
+    #     hep.cms.label(label=cms_decor, loc=0, ax=ax, data=True)
 
     ax.set_xlabel("($\\hat{L} - L_0 ) / L_0$")
     ax.set_ylabel("")
 
-    ax.legend(loc="upper right", ncol=2)
+    ax.legend(loc="upper right", ncol=1)
 
     # xmax = max(max(xx_hi), max(xx_hi_prefit))
     # xmin = -xmax
@@ -224,7 +281,11 @@ def plot_pulls_lumi(
     ax.set_xlim(xRange)
     ax.set_ylim(ymin, ymax + 1)
 
-    plot_tools.save_plot(outDir, "pulls_lumi")
+    yield_tables = [df]
+    if df_blue is not None:
+        yield_tables.append(df_blue)
+
+    plot_tools.save_plot(outDir, "pulls_lumi", yield_tables=yield_tables)
 
 
 def plot_scan(

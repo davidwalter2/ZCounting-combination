@@ -38,6 +38,12 @@ parser.add_argument(
     "--saturated", default=False, action="store_true", help="Run saturated model"
 )
 parser.add_argument(
+    "--chisqFit",
+    default=False,
+    action="store_true",
+    help="Perform chi^2 fit instead of binned Poisson likelihood",
+)
+parser.add_argument(
     "--simplify",
     default=False,
     action="store_true",
@@ -97,6 +103,42 @@ else:
     uncertainties_z, z_yields, covariance_z_prefit = functions.load_nuisances(
         args.zrate, args.eras
     )
+
+# for BLUE input
+# add statistical uncertainty on covariance for Z
+diag_indices = np.diag_indices(min(covariance_z_prefit.shape))
+covariance_z_prefit[diag_indices] += np.array([v for v in z_yields.values()])
+
+lumi = unc.correlated_values(
+    np.array([v for v in ref_lumi.values()]), covariance_lumi_prefit
+)
+nz = unc.correlated_values(
+    np.array([v / z_efficiencies[k] for k, v in z_yields.items()]), covariance_z_prefit
+)
+
+# high pileup lumi estimations
+lumi_z = np.array([nz[i] / nz[2] * lumi[3] for i in range(len(nz)) if i != 2])
+lumi_l = np.array([lumi[l] for l in range(len(lumi) - 1)])
+# covariances between these estimations
+
+cov_matrix = unc.covariance_matrix([*lumi_l, *lumi_z])
+std_devs = np.sqrt(np.diag(cov_matrix))
+correlation_matrix = cov_matrix / np.outer(std_devs, std_devs)
+
+# df_blue = pd.DataFrame(
+#     data={
+#         "era": ["2016", "2017", "2018", "Sum"],
+#         "postfit": [35933.854, 38454.986, 59141.564, 133530],
+#         "postfit_uncertainty": [273.497, 266.411, 408.164, 906.661],
+#         "prefit": [*[l.n for l in lumi_l], sum(lumi_l).n],
+#         "prefit_uncertainty": [*[l.s for l in lumi_l], sum(lumi_l).s],
+#         "prefit_z": [*[l.n for l in lumi_z], sum(lumi_z).n],
+#         "prefit_z_uncertainty": [*[l.s for l in lumi_z], sum(lumi_z).s],
+#     }
+# )
+df_blue = None
+
+# uncertainties_z = {}
 
 ref_lumi = {
     k: v
@@ -340,7 +382,12 @@ model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
 #     # azimov_hist = model.to_hist()
 #     data = model.to_binneddata()
 
-loss = zfit.loss.ExtendedBinnedNLL(
+if args.chisqFit:
+    nll = zfit.loss.ExtendedBinnedChi2
+else:
+    nll = zfit.loss.ExtendedBinnedNLL
+
+loss = nll(
     model,
     data,
     constraints=[c for c in constraints.values()],
@@ -405,26 +452,39 @@ for p, v in zip(result.params, correlated_values):
 lumi_function = [get_luminosity_function(era) for era in eras]
 lumi_values = [
     lumi_function[i]([result.params[iv]["correlated_value"] for iv in v])
-    for i, v in enumerate(nuisances_lumi_era.values())
+    for i, (e, v) in enumerate(nuisances_lumi_era.items())
 ]
 
 lumi_prefit = [ref_lumi[era] for era in eras]
-lumi_prefit.append(sum(lumi_prefit))
+lumi_prefit.append(sum([ref_lumi[era] for era in eras if era != "2017H"]))
 
 eras.append("Sum")
-lumi_values.append(sum(lumi_values))
+lumi_values.append(
+    sum(
+        [
+            lumi_function[i]([result.params[iv]["correlated_value"] for iv in v])
+            for i, (e, v) in enumerate(nuisances_lumi_era.items())
+            if e != "2017H"
+        ]
+    )
+)
 
 df_lumi = pd.DataFrame(
     data={
         "era": eras,
-        "value": unp.nominal_values(lumi_values),
-        "hesse": unp.std_devs(lumi_values),
+        "postfit": unp.nominal_values(lumi_values),
+        "postfit_uncertainty": unp.std_devs(lumi_values),
+        "prefit": [x.n for x in lumi_prefit],
+        "prefit_uncertainty": [x.s for x in lumi_prefit],
     }
 )
 
-df_lumi["prefit"] = lumi_prefit
-
-df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
+df_lumi["prefit_relative_uncertainty"] = (
+    df_lumi["prefit_uncertainty"] / df_lumi["prefit"]
+)
+df_lumi["postfit_relative_uncertainty"] = (
+    df_lumi["postfit_uncertainty"] / df_lumi["postfit"]
+)
 
 logger.info(df_lumi)
 
@@ -457,20 +517,52 @@ plot_matrix(
     outDir=outDir,
 )
 
+# pull plot for uncertainties related to PHYSICS lumi
+params_l = [result.params[p] for p in result.params if p.name.startswith("l")]
+names_l = np.array([p.label for p in result.params if p.name.startswith("l")])
 
-for i in range(int(len(result.params) / 20) + 1):
-    if len(result.params) < (i + 1) * 20:
-        idx_hi = None
-    else:
-        idx_hi = (i + 1) * 20
+plot_pulls(
+    params_l,
+    names_l,
+    outDir=outDir,
+    cms_decor=args.cmsDecor,
+    postfix="uncertainty_lumi",
+)
 
-    idx_lo = i * 20 if i != 0 else None
+# pll plot for uncertainties related to NZ
+params_z = [
+    result.params[p]
+    for p in result.params
+    if p.name.startswith("z") or p.name == "r_xsec"
+]
+names_z = np.array(
+    [p.label for p in result.params if p.name.startswith("z") or p.name == "r_xsec"]
+)
 
-    plot_pulls(
-        result, idx_lo=idx_lo, idx_hi=idx_hi, outDir=outDir, cms_decor=args.cmsDecor
-    )
+plot_pulls(
+    params_z, names_z, outDir=outDir, cms_decor=args.cmsDecor, postfix="uncertainty_z"
+)
 
-plot_pulls_lumi(df_lumi, chi2_info=chi2_info, outDir=outDir, cms_decor=args.cmsDecor)
+
+# for i in range(int(len(result.params) / 20) + 1):
+#     if len(result.params) < (i + 1) * 20:
+#         idx_hi = None
+#     else:
+#         idx_hi = (i + 1) * 20
+
+#     idx_lo = i * 20 if i != 0 else None
+
+#     plot_pulls(
+#         result, idx_lo=idx_lo, idx_hi=idx_hi, outDir=outDir, cms_decor=args.cmsDecor
+#     )
+
+plot_pulls_lumi(
+    df_lumi,
+    df_blue=df_blue,
+    chi2_info=chi2_info,
+    outDir=outDir,
+    cms_decor=args.cmsDecor,
+)
 
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, profile=False, outDir=outDir)
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)

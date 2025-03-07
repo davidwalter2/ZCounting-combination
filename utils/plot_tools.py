@@ -6,6 +6,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from utils import common, logging
 
@@ -67,29 +68,43 @@ def write_index_and_log(
         )
         logf.write(meta_info)
 
-        if yield_tables:
-            for k, v in yield_tables.items():
-                logf.write(f"Yield information for {k}\n")
-                logf.write("-" * 80 + "\n")
-                logf.write(str(v.round(nround)) + "\n\n")
+        if yield_tables is not None:
+            if isinstance(yield_tables, dict):
+                for k, v in yield_tables.items():
+                    logf.write(f"Yield information for {k}\n")
+                    logf.write("-" * 80 + "\n")
+                    logf.write(str(v.round(nround)) + "\n\n")
 
-            if (
-                "Unstacked processes" in yield_tables
-                and "Stacked processes" in yield_tables
-            ):
-                if "Data" in yield_tables["Unstacked processes"]["Process"].values:
-                    unstacked = yield_tables["Unstacked processes"]
-                    data_yield = unstacked[unstacked["Process"] == "Data"][
-                        "Yield"
-                    ].iloc[0]
-                    ratio = (
-                        float(
-                            yield_tables["Stacked processes"]["Yield"].sum()
-                            / data_yield
+                if (
+                    "Unstacked processes" in yield_tables
+                    and "Stacked processes" in yield_tables
+                ):
+                    if "Data" in yield_tables["Unstacked processes"]["Process"].values:
+                        unstacked = yield_tables["Unstacked processes"]
+                        data_yield = unstacked[unstacked["Process"] == "Data"][
+                            "Yield"
+                        ].iloc[0]
+                        ratio = (
+                            float(
+                                yield_tables["Stacked processes"]["Yield"].sum()
+                                / data_yield
+                            )
+                            * 100
                         )
-                        * 100
-                    )
-                    logf.write(f"===> Sum unstacked to data is {ratio:.2f}%")
+                        logf.write(f"===> Sum unstacked to data is {ratio:.2f}%")
+            elif isinstance(yield_tables, pd.DataFrame):
+                logf.write("\t".join(yield_tables.columns) + "\n")
+                for index, row in yield_tables.iterrows():
+                    line = "\t".join(map(str, row.values))
+                    logf.write(line + "\n")
+            if isinstance(yield_tables, list):
+                for df in yield_tables:
+                    logf.write("-" * 80 + "\n")
+                    if isinstance(df, pd.DataFrame):
+                        logf.write("\t".join(df.columns) + "\n")
+                        for index, row in df.iterrows():
+                            line = "\t".join(map(str, row.values))
+                            logf.write(line + "\n")
 
         if analysis_meta_info:
             for k, analysis_info in analysis_meta_info.items():
@@ -100,12 +115,13 @@ def write_index_and_log(
         logger.info(f"Writing file {logname}")
 
 
-def save_plot(outdir, outfile, args=None):
+def save_plot(outdir, outfile, yield_tables=None, args=None):
 
     save_pdf_and_png(outdir, outfile)
 
     write_index_and_log(
         outdir,
         outfile,
+        yield_tables=yield_tables,
         args=args,
     )

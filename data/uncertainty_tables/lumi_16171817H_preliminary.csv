@@ -1,5 +1,5 @@
 Description,                   Corr,2016,2017,2018,2017H
-Luminosity,                      -,   36.33, 41.48, 59.83, 0.1998
+Luminosity,                      -,   36330, 41480, 59830, 199.8
 # Normalization
 X-Y factorization,               C,   0.5, 0.8, 2.0, 0.8
 Length scale,                    C,   0.3, 0.3, 0.2, 0.3
