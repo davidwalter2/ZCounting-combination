@@ -24,7 +24,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--lumi",
-    default=f"{common.dir_data}/uncertainty_tables/lumi_16171817H.csv",
+    default=f"{common.dir_data}/uncertainty_tables/luminosity_all_years_2017h_V3.csv",
     type=str,
     help="file containing uncertainties on luminosity",
 )
@@ -52,6 +52,32 @@ logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 outDir = output_tools.make_plot_dir(
     args.outpath, args.outfolder, eoscp=output_tools.is_eosuser_path(args.outpath)
 )
+
+# # for manually reproducing:
+# df_lumi = pd.DataFrame(
+#     data={
+#         "era": ["2016", "2017", "2018", "2017H", "Sum"],
+#         "value": np.array([35946.39738941, 38447.87459891, 59142.73452099, 203.4959755, 133740.5024848]),
+#         "hesse": np.array([292.9136076, 275.0399035, 421.96561489, 1.57895546, 942.60043282]),
+#         "prefit": np.array([unc.ufloat(x,y) for x,y in [
+#             (36296.19598800001, 447.48955760586733),
+#             (38185.85875300001, 327.1081881621193),
+#             (59353.403407000005, 492.70475321327274),
+#             (201.83848000000003, 1.9727581934925795),
+#             (134037.296628, 976.5573114986731)]])
+#     }
+# )
+
+# df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
+
+# chi2_info = [3.356578950708439, 3, 34]
+
+# plot_pulls_lumi(df_lumi, chi2_info=chi2_info, outDir=outDir, cms_decor=args.cmsDecor)
+
+# if output_tools.is_eosuser_path(args.outpath):
+#     output_tools.copy_to_eos(outDir, args.outpath, args.outfolder)
+
+# exit()
 
 # --- settings
 
@@ -269,7 +295,7 @@ def get_luminosity_function(era):
     return function
 
 
-def get_nexp_function(era, unc_dict):
+def get_nexp_function(era):
     # return function to calculate number of expected Z events
 
     z_eff = z_efficiencies[era]
@@ -281,7 +307,7 @@ def get_nexp_function(era, unc_dict):
     def function(params):
         nexp = nexp_0 * params[0]
         for i, p in enumerate(params[1:]):
-            nexp *= unc_dict[era][i] ** p
+            nexp *= uncertainties_era[era][i] ** p
         return nexp
 
     return function
@@ -304,7 +330,7 @@ for i, era in enumerate(eras):
     # Number of expected Z events, including uncertainties on cross section, acceptance, and efficiencies
     nexp = zfit.ComposedParameter(
         f"nexp_{era}".format(era),
-        get_nexp_function(era, uncertainties_era),
+        get_nexp_function(era),
         params=[
             rate_xsec,
             *nuisances_era[era],
@@ -322,7 +348,7 @@ for i, era in enumerate(eras):
         # Number of expected Z events, including uncertainties on cross section, acceptance, and efficiencies
         nexp_saturated = zfit.ComposedParameter(
             f"nexp_{era}".format(era),
-            get_nexp_function(era, uncertainties_era),
+            get_nexp_function(era),
             params=[
                 rate_xsec_saturated[i],
                 *nuisances_era[era],
@@ -335,6 +361,13 @@ for i, era in enumerate(eras):
 
 logger.info("Build composite model")
 model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
+
+nexp_prefit = np.array(
+    [
+        model.params["frac_0"].params["sum_yields"].params[f"yield_{i}"].value().numpy()
+        for i, v in enumerate(eras)
+    ]
+)
 
 # if not args.unblind:
 #     # azimov_hist = model.to_hist()
@@ -403,7 +436,7 @@ for p, v in zip(result.params, correlated_values):
     result.params[p]["correlated_value"] = v
 
 lumi_function = [get_luminosity_function(era) for era in eras]
-lumi_values = [
+lumi_postfit = [
     lumi_function[i]([result.params[iv]["correlated_value"] for iv in v])
     for i, v in enumerate(nuisances_lumi_era.values())
 ]
@@ -412,25 +445,46 @@ lumi_prefit = [ref_lumi[era] for era in eras]
 lumi_prefit.append(sum(lumi_prefit))
 
 eras.append("Sum")
-lumi_values.append(sum(lumi_values))
+lumi_postfit.append(sum(lumi_postfit))
 
 df_lumi = pd.DataFrame(
     data={
         "era": eras,
-        "value": unp.nominal_values(lumi_values),
-        "hesse": unp.std_devs(lumi_values),
+        "value": unp.nominal_values(lumi_postfit),
+        "hesse": unp.std_devs(lumi_postfit),
     }
 )
 
 df_lumi["prefit"] = lumi_prefit
 
+# nexp_function = [get_nexp_function(era) for era in eras[:-1]]
+# nexp_values = [
+#     nexp_function[i]([result.params[iv]["correlated_value"] for iv in v])
+#     for i, v in enumerate(nuisances_era.values())
+# ]
+# nexp_prefit = [z_yields[era] for era in eras[:-1]]
+# nexp_prefit.append(sum(lumi_prefit))
+
+# nexp_prefit = np.array([z_yields[era].n for era in eras[:-1]])
+lumi_scale = np.array([v.n for v in lumi_postfit]) / np.array(lumi_prefit)
+
+nexp_postfit = np.array(
+    [
+        model.params["frac_0"].params["sum_yields"].params[f"yield_{i}"].value().numpy()
+        for i, v in enumerate(eras[:-1])
+    ]
+)
+
+nexp_scale = nexp_postfit / nexp_prefit
+
 df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
 
 logger.info(df_lumi)
 
-corr_matrix_lumi = unc.correlation_matrix(lumi_values)
+
+corr_matrix_lumi = unc.correlation_matrix(lumi_postfit)
 cov_matrix_lumi = (
-    np.array(unc.covariance_matrix(lumi_values)) / 1000000.0
+    np.array(unc.covariance_matrix(lumi_postfit)) / 1000000.0
 )  # covariance matrix in fb
 
 # logger.info(corr_matrix_lumi)
@@ -471,6 +525,7 @@ for i in range(int(len(result.params) / 20) + 1):
     )
 
 plot_pulls_lumi(df_lumi, chi2_info=chi2_info, outDir=outDir, cms_decor=args.cmsDecor)
+
 
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, profile=False, outDir=outDir)
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)

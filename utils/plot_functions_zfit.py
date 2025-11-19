@@ -4,6 +4,8 @@ import numpy as np
 
 from utils import logging, plot_tools, styles
 
+hep.style.use(hep.style.CMS)
+
 logger = logging.child_logger(__name__)
 
 
@@ -95,6 +97,9 @@ def plot_pulls(
     if idx_hi is not None:
         name += f"to{idx_hi}"
 
+    if cms_decor is not None:
+        name += f"_{cms_decor.strip()}"
+
     plot_tools.save_plot(outDir, name)
 
 
@@ -102,7 +107,7 @@ def plot_pulls_lumi(
     dataframe,
     chi2_info=None,
     outDir="./",
-    xRange=(-0.03, 0.02),
+    xRange=(-0.038, 0.018),
     markersize=4,
     cms_decor=None,
 ):
@@ -112,7 +117,9 @@ def plot_pulls_lumi(
 
     logger.info("Make plot of lumi results")
 
-    names = dataframe["era"].values
+    translate = {"2017H": "2017\n low PU"}
+
+    names = [translate.get(n, n) for n in dataframe["era"].values]
 
     xx_prefit = dataframe["prefit"].apply(lambda x: x.n).values
 
@@ -132,24 +139,27 @@ def plot_pulls_lumi(
 
     # ax.plot([-0.02, -0.02], [ymin, ymax], linestyle="dashed", color="gray")
     # ax.plot([0.02, 0.02], [ymin, ymax], linestyle="dashed", color="gray")
-    ax.plot([-0.01, -0.01], [ymin, ymax], linestyle="dashed", color="gray")
-    ax.plot([0.01, 0.01], [ymin, ymax], linestyle="dashed", color="gray")
-    ax.plot([0.0, 0.0], [ymin, ymax], linestyle="dashed", color="gray")
+    ax.plot([-0.01, -0.01], [ymin, ymax - 0.5], linestyle="dashed", color="gray")
+    ax.plot([0.01, 0.01], [ymin, ymax - 0.5], linestyle="dashed", color="gray")
+    ax.plot([0.0, 0.0], [ymin, ymax - 0.5], linestyle="dashed", color="gray")
 
     # nround = lambda x: round(x, 3)
     # for i, r in enumerate(is_rate):
     #     if r:
     #         ax.text(-0.5, yy[i]-0.4, "$"+str(nround(xx[i]))+"^{+"+str(nround(xx_hi[i]))+"}_{"+str(nround(xx_lo[i]))+"}$")
 
+    textsize_ticks = ax.yaxis.get_ticklabels()[0].get_fontsize()
+
     ax.errorbar(
         np.zeros_like(xx_prefit),
         yy + 0.2,
         xerr=(abs(xx_lo_prefit), abs(xx_hi_prefit)),
-        label="prefit",
+        label="Prefit",
         fmt="bo",
         ecolor="blue",
-        elinewidth=1.0,
-        capsize=1.0,
+        elinewidth=2.0,
+        capsize=2.0,
+        linewidth=2,
         barsabove=True,
         markersize=markersize,
     )
@@ -158,18 +168,15 @@ def plot_pulls_lumi(
         xx,
         yy - 0.2,
         xerr=(abs(xx_lo), abs(xx_hi)),
-        label="postfit",
+        label="Postfit",
         fmt="ko",
         ecolor="black",
-        elinewidth=1.0,
-        capsize=1.0,
+        elinewidth=2.0,
+        capsize=2.0,
+        linewidth=2,
         barsabove=True,
         markersize=markersize,
     )
-
-    import pdb
-
-    pdb.set_trace()
 
     for y, x, x_lo, x_prefit, x_lo_prefit in zip(
         yy, xx, xx_lo, xx_prefit, xx_lo_prefit
@@ -182,31 +189,34 @@ def plot_pulls_lumi(
         nround = 1 if x > 10 else 3
 
         ax.text(
-            xRange[0] + 0.01 * (xRange[1] - xRange[0]),
+            xRange[0] + 0.02 * (xRange[1] - xRange[0]),
             y + 0.2,
             rf"${round(x_prefit,nround)} \pm {round(abs(x_lo_prefit),nround)} \,\mathrm{{fb}}^{{-1}}$",
             va="center",
             ha="left",
             color="blue",
+            fontsize=textsize_ticks,
         )
         ax.text(
-            xRange[0] + 0.01 * (xRange[1] - xRange[0]),
+            xRange[0] + 0.03 * (xRange[1] - xRange[0]),
             y - 0.2,
             rf"${round(x,nround)} \pm {round(abs(x_lo),nround)} \,\mathrm{{fb}}^{{-1}}$",
             va="center",
             ha="left",
+            fontsize=textsize_ticks,
         )
 
     if chi2_info is not None:
         ax.text(
-            0.01,
-            0.99,
+            0.03,
+            0.97,
             rf"$\chi^2/ndf = {round(chi2_info[0],2)}/{chi2_info[1]}$"
             + "\n"
             + rf" $(p={chi2_info[2]}\%)$",
             va="top",
             ha="left",
             transform=ax.transAxes,
+            fontsize=textsize_ticks,
         )
 
     if cms_decor is not None:
@@ -215,16 +225,16 @@ def plot_pulls_lumi(
     ax.set_xlabel("($\\hat{L} - L_0 ) / L_0$")
     ax.set_ylabel("")
 
-    ax.legend(loc="upper right", ncol=2)
+    ax.legend(loc="upper right", ncol=1)
 
     # xmax = max(max(xx_hi), max(xx_hi_prefit))
     # xmin = -xmax
 
     ax.set_yticks(np.arange(len(names)), labels=names)
     ax.set_xlim(xRange)
-    ax.set_ylim(ymin, ymax + 1)
+    ax.set_ylim(ymin + 0.5, ymax + 0.5)
 
-    plot_tools.save_plot(outDir, "pulls_lumi")
+    plot_tools.save_plot(outDir, f"pulls_lumi{cms_decor.strip()}")
 
 
 def plot_scan(

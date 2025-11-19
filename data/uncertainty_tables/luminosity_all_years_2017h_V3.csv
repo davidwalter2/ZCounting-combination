@@ -1,0 +1,35 @@
+Description,                   Corr,2015,2016,2017,2018,2017H
+Luminosity,                    -, 0.0, 36296.19598800001, 38294.085012, 59353.403407, 202.248854
+
+# Normalization
+###
+X-Y factorization (15-16),     C,   0.5, 0.5, 0.0,  0.0,   0.0
+X-Y factorization (17-18),     C,   0.0, 0.0, 0.33, 0.36, 0.33
+###
+Length scale (15-16),          C,   0.2, 0.3, 0.0,  0.0,  0.0
+Length scale (17-18),          C,   0.0, 0.0, 0.15, 0.18, 0.15
+#Length scale (17),             C,   0.0, 0.0, 0.12, 0.0,  0.12
+#Length scale (18),             U,   0.0, 0.0, 0.0,  0.14, 0.0
+Orbit drift Syst,              C,   0.8, 0.5, 0.09, 0.19, 0.09
+Orbit drift Rand,              U,   0.2, 0.1, 0.0,  0.0,  0.0
+#Beam-beam effects (15-16),     C,   0.5, 0.5, 0.0,  0.0,  0.0
+#Beam-beam effects (17-18),     C,   0.0, 0.0, 0.29, 0.30, 0.29
+Beam-beam effects,             C,   0.5, 0.5, 0.29, 0.30, 0.29
+Beam current calibration,      C,   0.2, 0.2, 0.2,  0.2,  0.2
+Ghosts and satellites,         C,   0.1, 0.1, 0.06, 0.07, 0.06
+####
+Other variations,              U,   0.6, 0.3, 0.0,  0.0,  0.0
+Scan to scan variation,        U,   0.0, 0.0, 0.0,  0.27, 0.0
+Scan to scan variation (17),   C,   0.0, 0.0, 0.26, 0.0,  0.26
+Bunch to bunch variation,      U,   0.0, 0.0, 0.0,  0.1,  0.0
+Bunch to bunch variation (17), C,   0.0, 0.0, 0.1,  0.0,  0.1
+Cross-detector stability vdM,      U,   0.0, 0.0, 0.0,  0.14, 0.0
+Cross-detector stability vdM(17),  C,   0.0, 0.0, 0.17, 0.0,  0.17
+###
+# Integration
+PCC afterglow type 1 (15-16),  C,   0.3, 0.3, 0.0,  0.0,  0.0
+PCC afterglow type 2 (15-16),  C,   0.1, 0.3, 0.0,  0.0,  0.0
+Cross-detector stability,      U,   0.6, 0.5, 0.19, 0.30, 0.67
+PCC linearity (15-16),         C,   0.5, 0.3, 0.0,  0.0,  0.0
+Linearity (17-18),             C,   0.0, 0.0, 0.51, 0.42, 0.04
+CMS deadtime,                  U,   0.5, 0.1, 0.0,  0.0,  0.0
